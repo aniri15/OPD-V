@@ -164,11 +164,11 @@ bash scripts/run_opdv.sh \
 
 ## Method Options
 
-By default, training uses OPD-V self-distillation with a cropped/box-image positive teacher, JSD-style token distillation, and multiple on-policy student responses per prompt.
+By default, training uses OPD-V self-distillation with a cropped/box-image positive teacher, a random-mask negative teacher, JSD-style token distillation, and multiple on-policy student responses per prompt.
 
 ### Standard OPD-V
 
-Positive teacher input: cropped/box image from `bbox_images`.
+Positive teacher input: cropped/box image from `bbox_images`. Negative teacher input: a random-mask perturbation of the positive teacher image.
 
 ```bash
 bash scripts/run_opdv.sh

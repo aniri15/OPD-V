@@ -143,6 +143,8 @@ echo "Teacher update rate: $TEACHER_UPDATE_RATE"
     actor_rollout_ref.actor.self_distillation.teacher_regularization=$TEACHER_REGULARIZATION \
     actor_rollout_ref.actor.self_distillation.teacher_update_rate=$TEACHER_UPDATE_RATE \
     actor_rollout_ref.actor.self_distillation.teacher_image_key=bbox_images \
+    actor_rollout_ref.actor.self_distillation.contrastive_visual_advantage=True \
+    actor_rollout_ref.actor.self_distillation.contrastive_negative_mode=random-mask \
     algorithm.rollout_correction.rollout_is=token \
     algorithm.rollout_correction.rollout_is_threshold=2.0 \
     algorithm.adv_estimator=grpo \
