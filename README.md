@@ -1,6 +1,44 @@
 # OPD-V
 
-OPD-V trains multimodal models with on-policy self-distillation, contrastive visual-advantage weighting, OPSD-style answer-hint prompting, visual corruption baselines, and visual-token drop variants.
+OPD-V is a visual On-Policy Self-Distillation (OPSD) framework for improving multimodal reasoning under Modality Imbalance. Instead of relying on a single privileged teacher, OPD-V contrasts a Positive Teacher conditioned on a Zoom-In Image with a Negative Teacher conditioned on a Mask Image, and distills only the on-policy tokens selected by the resulting Modality-Balance Trust Region.
+
+This repository contains the training code, data preparation utilities, evaluation scripts, and links to released model checkpoints for the paper:
+
+> OPD-V: Visual On-Policy Self-Distillation with Modality Balance
+
+## Highlights
+
+- Plug-and-play visual OPSD training for multimodal large language models.
+- Positive/Negative Teacher construction from Zoom-In and Mask Image conditions.
+- Tokenwise Modality-Balance Logits Margin and Modality-Balance Trust Region for selective self-distillation.
+- verl-based training stack with OPD-V rollout construction, checkpoint merging, serving, and evaluation scripts.
+- Released checkpoints for Qwen3-VL and Qwen3.5 backbones.
+
+## Released Resources
+
+| Resource | Link |
+| --- | --- |
+| Source code | [OPD-V GitHub repository](https://github.com/aniri15/OPD-V) |
+| Training launcher | [`scripts/run_opdv.sh`](scripts/run_opdv.sh) |
+| Data preparation | [`scripts/prepare_data.py`](scripts/prepare_data.py) |
+| Evaluation scripts | [`eval/run_eval.sh`](eval/run_eval.sh) |
+
+### Released Checkpoints
+
+| Backbone | Method | Hugging Face |
+| --- | --- | --- |
+| Qwen3-VL-8B-Instruct | OPD-V | [HF](https://huggingface.co/aaniri/OPD-V-Qwen3-VL-8B-Instruct) |
+| Qwen3-VL-4B-Instruct | OPD-V | [HF](https://huggingface.co/aaniri/OPD-V-Qwen3-VL-4B-Instruct) |
+| Qwen3.5-9B | OPD-V | [HF](https://huggingface.co/aaniri/OPD-V-Qwen3.5-9B) |
+| Qwen3.5-4B | OPD-V | [HF](https://huggingface.co/aaniri/OPD-V-Qwen3.5-4B) |
+
+## Overview
+
+During training, the student receives the Original Image, the Positive Teacher receives the Zoom-In Image, and the Negative Teacher receives the Mask Image. Their tokenwise Modality-Balance Logits Margin defines the Modality-Balance Trust Region, where OPD-V applies Jensen--Shannon distillation from the Positive Teacher to the student.
+
+<p align="center">
+  <img src="figures/opdv_teaser.png" alt="OPD-V method overview" width="95%">
+</p>
 
 ## Environment
 
@@ -147,9 +185,9 @@ bash scripts/run_opdv.sh \
   actor_rollout_ref.actor.self_distillation.teacher_prompt_mode=answer_hint
 ```
 
-### Contrastive Visual Advantage
+### Modality-Balance Trust Region
 
-Positive teacher still defines the distillation target. Negative teacher is used only to compute token weights.
+The Positive Teacher supplies the distillation target, while the Negative Teacher supplies the paired comparison for the same student-generated tokens. Positive Modality-Balance Logits Margins define the Modality-Balance Trust Region.
 
 Random-mask negative teacher:
 
@@ -215,7 +253,7 @@ bash scripts/run_opdv.sh actor_rollout_ref.actor.self_distillation.alpha=0.5
 
 ## Analysis Dumps
 
-Dump per-token visual-advantage analysis:
+Dump per-token Modality-Balance Logits Margin analysis:
 
 ```bash
 bash scripts/run_opdv.sh \
@@ -332,9 +370,9 @@ ${PYTHON} scripts/upload_training_to_wandb.py \
 ## Citation
 
 ```bibtex
-@article{opdv2026,
-  title={OPD-V},
-  journal={arXiv preprint},
+@misc{opdv2026,
+  title={OPD-V: Visual On-Policy Self-Distillation with Modality Balance},
+  author={Aniri and Jinhe Bi and Peng Liao and Zengjie Jin and Volker Tresp and Fei Shen and Yunpu Ma and Tat-Seng Chua},
   year={2026}
 }
 ```
