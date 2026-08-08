@@ -44,7 +44,7 @@ This repository contains the training code, data preparation utilities, evaluati
 During training, the student receives the Original Image, the Positive Teacher receives the Zoom-In Image, and the Negative Teacher receives the Mask Image. Their tokenwise Modality-Balance Logits Margin defines the Modality-Balance Trust Region, where OPD-V applies Jensen--Shannon distillation from the Positive Teacher to the student.
 
 <p align="center">
-  <img src="figures/opdv_teaser.png" alt="OPD-V method overview" width="95%">
+  <img src="figures/opdv-teaser.png" alt="OPD-V method overview" width="95%">
 </p>
 
 ## Environment
