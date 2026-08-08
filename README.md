@@ -1,5 +1,12 @@
 # OPD-V
 
+<p align="center">
+  <a href="https://github.com/aniri15/OPD-V"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-OPD--V-181717?logo=github"></a>
+  <a href="https://arxiv.org/abs/2608.05131v2"><img alt="arXiv" src="https://img.shields.io/badge/arXiv-2608.05131-b31b1b?logo=arxiv&logoColor=white"></a>
+  <a href="https://huggingface.co/aaniri/OPD-V-Qwen3.5-4B"><img alt="Hugging Face" src="https://img.shields.io/badge/Hugging%20Face-Models-ffcc4d?logo=huggingface&logoColor=black"></a>
+  <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-green"></a>
+</p>
+
 OPD-V is a visual On-Policy Self-Distillation (OPSD) framework for improving multimodal reasoning under Modality Imbalance. Instead of relying on a single privileged teacher, OPD-V contrasts a Positive Teacher conditioned on a Zoom-In Image with a Negative Teacher conditioned on a Mask Image, and distills only the on-policy tokens selected by the resulting Modality-Balance Trust Region.
 
 This repository contains the training code, data preparation utilities, evaluation scripts, and links to released model checkpoints for the paper:
@@ -27,10 +34,10 @@ This repository contains the training code, data preparation utilities, evaluati
 
 | Backbone | Method | Hugging Face |
 | --- | --- | --- |
-| Qwen3-VL-8B-Instruct | OPD-V | [HF](https://huggingface.co/aaniri/OPD-V-Qwen3-VL-8B-Instruct) |
-| Qwen3-VL-4B-Instruct | OPD-V | [HF](https://huggingface.co/aaniri/OPD-V-Qwen3-VL-4B-Instruct) |
-| Qwen3.5-9B | OPD-V | [HF](https://huggingface.co/aaniri/OPD-V-Qwen3.5-9B) |
-| Qwen3.5-4B | OPD-V | [HF](https://huggingface.co/aaniri/OPD-V-Qwen3.5-4B) |
+| Qwen3-VL-8B-Instruct | OPD-V | [![HF](https://img.shields.io/badge/HF-OPD--V--Qwen3--VL--8B-ffcc4d?logo=huggingface&logoColor=black)](https://huggingface.co/aaniri/OPD-V-Qwen3-VL-8B-Instruct) |
+| Qwen3-VL-4B-Instruct | OPD-V | [![HF](https://img.shields.io/badge/HF-OPD--V--Qwen3--VL--4B-ffcc4d?logo=huggingface&logoColor=black)](https://huggingface.co/aaniri/OPD-V-Qwen3-VL-4B-Instruct) |
+| Qwen3.5-9B | OPD-V | [![HF](https://img.shields.io/badge/HF-OPD--V--Qwen3.5--9B-ffcc4d?logo=huggingface&logoColor=black)](https://huggingface.co/aaniri/OPD-V-Qwen3.5-9B) |
+| Qwen3.5-4B | OPD-V | [![HF](https://img.shields.io/badge/HF-OPD--V--Qwen3.5--4B-ffcc4d?logo=huggingface&logoColor=black)](https://huggingface.co/aaniri/OPD-V-Qwen3.5-4B) |
 
 ## Overview
 
