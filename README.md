@@ -174,15 +174,6 @@ Positive teacher input: cropped/box image from `bbox_images`. Negative teacher i
 bash scripts/run_opdv.sh
 ```
 
-### Extra Positive Teacher Image
-
-Positive teacher input: student image plus repeated copies of the same student image.
-
-```bash
-bash scripts/run_opdv.sh \
-  actor_rollout_ref.actor.self_distillation.teacher_extra_student_image_blocks=1
-```
-
 ### OPSD Answer Hint
 
 Positive teacher input: normal image and answer-hint text prompt.
