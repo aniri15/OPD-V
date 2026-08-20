@@ -2,7 +2,8 @@
 
 <p align="center">
   <a href="https://github.com/aniri15/OPD-V"><img alt="GitHub" src="https://img.shields.io/badge/GitHub-OPD--V-181717?logo=github"></a>
-  <a href="https://arxiv.org/abs/2608.05131v2(https://arxiv.org/abs/2608.16697)"><img alt="arXiv" src="https://img.shields.io/badge/arXiv-2608.05131-b31b1b?logo=arxiv&logoColor=white"></a>
+  <a href="https://arxiv.org/abs/2608.05131v2"><img alt="arXiv" src="https://img.shields.io/badge/arXiv-2608.05131-b31b1b?logo=arxiv&logoColor=white"></a>
+  <a href="https://huggingface.co/aaniri/OPD-V-Qwen3.5-4B"><img alt="Hugging Face" src="https://img.shields.io/badge/Hugging%20Face-Models-ffcc4d?logo=huggingface&logoColor=black"></a>
   <a href="./LICENSE"><img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-green"></a>
 </p>
 
