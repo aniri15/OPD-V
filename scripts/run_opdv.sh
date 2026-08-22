@@ -16,6 +16,8 @@ MODEL_PATH="${MODEL_PATH:-Qwen/Qwen3.5-4B}"
 TEACHER_MODEL_SOURCE="legacy"
 TEACHER_REGULARIZATION="ema"
 TEACHER_UPDATE_RATE=0.05
+CONTRASTIVE_VISUAL_ADVANTAGE="${CONTRASTIVE_VISUAL_ADVANTAGE:-True}"
+CONTRASTIVE_NEGATIVE_MODE="${CONTRASTIVE_NEGATIVE_MODE:-random-mask}"
 
 # Tuned for 4 GPUs by default.
 TRAIN_BATCH_SIZE=48
@@ -143,8 +145,8 @@ echo "Teacher update rate: $TEACHER_UPDATE_RATE"
     actor_rollout_ref.actor.self_distillation.teacher_regularization=$TEACHER_REGULARIZATION \
     actor_rollout_ref.actor.self_distillation.teacher_update_rate=$TEACHER_UPDATE_RATE \
     actor_rollout_ref.actor.self_distillation.teacher_image_key=bbox_images \
-    actor_rollout_ref.actor.self_distillation.contrastive_visual_advantage=True \
-    actor_rollout_ref.actor.self_distillation.contrastive_negative_mode=random-mask \
+    actor_rollout_ref.actor.self_distillation.contrastive_visual_advantage=$CONTRASTIVE_VISUAL_ADVANTAGE \
+    actor_rollout_ref.actor.self_distillation.contrastive_negative_mode=$CONTRASTIVE_NEGATIVE_MODE \
     algorithm.rollout_correction.rollout_is=token \
     algorithm.rollout_correction.rollout_is_threshold=2.0 \
     algorithm.adv_estimator=grpo \
