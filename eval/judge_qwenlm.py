@@ -12,6 +12,7 @@ MCQ_BENCHMARKS = [
     "hrbench-4k",
     "hrbench-8k",
     "vstar",
+    "zoombench",
     "mme-realworld",
     "mme-realworld-cn",
 ]
@@ -22,56 +23,94 @@ PROMPT_TEMPLATE = (
     "The question is: {question}\n"
     "The answer is: {gt}\n"
     "The response is: {response}\n"
+    "For multiple-choice questions, treat the response as correct if its final "
+    "selected option letter or option text matches the ground-truth answer. "
+    "Ignore reasoning that mentions other options before the final answer. "
     "Please check and compare them and then judge. "
     "If the response is correct, your output should be Yes. "
     "Otherwise, your output should be No. Directly give me your output."
 )
 
 
-def extract_first_option(text):
-    if not text:
+def extract_answer(model_answer_raw):
+    if not isinstance(model_answer_raw, str):
         return ""
-    match = re.search(r"\(([A-Z])\)", text)
-    if match:
-        return match.group(1)
-    match = re.search(r"([A-Z])[\.\)\s]", text)
-    if match:
-        return match.group(1)
-    match = re.search(r"([A-Z])", text)
-    if match:
-        return match.group(1)
-    return ""
+    text = model_answer_raw
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[-1]
+    blocks = re.findall(r"<answer>(.*?)</answer>", text, flags=re.IGNORECASE | re.DOTALL)
+    if blocks:
+        return blocks[-1].strip()
+    marker = "Answer:"
+    if marker in text:
+        return text[text.rfind(marker) :].strip()
+    return text.strip()
 
 
-def extract_mcq_option(answer):
-    if not isinstance(answer, str) or not answer:
+def extract_gt_option(gt):
+    if not isinstance(gt, str):
+        return ""
+    match = re.search(r"([A-F])", gt.strip(), flags=re.IGNORECASE)
+    return match.group(1).upper() if match else ""
+
+
+def extract_strict_final_option(answer):
+    if not isinstance(answer, str) or not answer.strip():
         return ""
     text = answer.strip()
-    pattern = r"^[ (\[]*([A-F])(?:(?=$)|[\.\)\]]|(?:[\:\-]\s+))"
-    match = re.match(pattern, text)
+    if "</think>" in text:
+        text = text.rsplit("</think>", 1)[-1].strip()
+    blocks = re.findall(r"<answer>(.*?)</answer>", text, flags=re.IGNORECASE | re.DOTALL)
+    if blocks:
+        text = blocks[-1].strip()
+
+    strong_patterns = [
+        r"(?:final\s+answer|correct\s+answer|answer|final\s+choice|correct\s+option)"
+        r"\s*(?:is)?\s*:?\s*(?:\*\*)?\s*\(?([A-F])\)?\s*(?:\*\*)?(?=$|[\s\.\),;:])",
+        r"(?:therefore|thus|so)\s*,?\s*(?:the\s+)?(?:final\s+)?(?:correct\s+)?answer\s*(?:is)?"
+        r"\s*:?\s*(?:\*\*)?\s*\(?([A-F])\)?\s*(?:\*\*)?(?=$|[\s\.\),;:])",
+    ]
+    candidates = []
+    for pattern in strong_patterns:
+        for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+            candidates.append((match.start(), match.group(1).upper()))
+    if candidates:
+        return sorted(candidates)[-1][1]
+
+    short = text.strip()
+    match = re.search(r"^\s*(?:\*\*)?\s*\(?([A-F])\)?\s*(?:\*\*)?\s*[\.)]?\s*$", short, flags=re.IGNORECASE)
     if match:
-        return match.group(1)
+        return match.group(1).upper()
+
+    for line in reversed([line.strip() for line in short.splitlines() if line.strip()]):
+        match = re.search(
+            r"^\s*(?:\*\*)?\s*\(?([A-F])\)?\s*(?:\*\*)?\s*[\.)]?\s*$",
+            line,
+            flags=re.IGNORECASE,
+        )
+        if match:
+            return match.group(1).upper()
+        if len(line) > 80:
+            break
     return ""
 
 
-def first_letter_match(gt, answer):
-    gt_val = extract_mcq_option(gt)
-    pred_val = extract_first_option(answer)
-    return bool(gt_val and pred_val and gt_val == pred_val)
+def normalize_judge(text):
+    value = (text or "").strip()
+    has_yes = re.search(r"\byes\b", value, flags=re.IGNORECASE)
+    has_no = re.search(r"\bno\b", value, flags=re.IGNORECASE)
+    if has_yes and not has_no:
+        return "Yes"
+    if has_no and not has_yes:
+        return "No"
+    if value.lower().startswith("yes"):
+        return "Yes"
+    if value.lower().startswith("no"):
+        return "No"
+    return value
 
 
-def extract_answer(model_answer_raw):
-    if "<answer>" in model_answer_raw:
-        start = model_answer_raw.find("<answer>")
-        end = model_answer_raw.find("</answer>")
-        if start != -1 and end != -1:
-            return model_answer_raw[start + len("<answer>") : end].strip()
-    if "Answer:" in model_answer_raw:
-        return model_answer_raw[model_answer_raw.find("Answer:") :].strip()
-    return model_answer_raw.strip()
-
-
-def judge_via_api(prompts, api_base, api_key, judge_model, judge_max_tokens, parallel_workers=32):
+def judge_via_api(prompts, api_base, api_key, judge_model, judge_max_tokens, parallel_workers=32, judge_rpm=0):
     from openai import OpenAI
 
     thread_local = threading.local()
@@ -86,30 +125,51 @@ def judge_via_api(prompts, api_base, api_key, judge_model, judge_max_tokens, par
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     results = [""] * len(prompts)
+    errors = [""] * len(prompts)
+
+    min_interval = 60.0 / judge_rpm if judge_rpm and judge_rpm > 0 else 0.0
+    rate_lock = threading.Lock()
+    next_allowed_time = [0.0]
+
+    def wait_for_rate_limit_slot():
+        if min_interval <= 0:
+            return
+        with rate_lock:
+            now = time.monotonic()
+            wait_time = max(0.0, next_allowed_time[0] - now)
+            next_allowed_time[0] = max(now, next_allowed_time[0]) + min_interval
+        if wait_time > 0:
+            time.sleep(wait_time)
 
     def call_one(idx, prompt):
         client = get_client()
-        for attempt in range(3):
+        last_error = ""
+        for attempt in range(6):
             try:
+                wait_for_rate_limit_slot()
                 resp = client.chat.completions.create(
                     model=judge_model,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0,
                     max_tokens=judge_max_tokens,
                 )
-                return idx, (resp.choices[0].message.content or "").strip()
-            except Exception:
-                if attempt < 2:
-                    time.sleep(1.0)
-        return idx, "No"
+                return idx, (resp.choices[0].message.content or "").strip(), ""
+            except Exception as exc:  # noqa: BLE001
+                last_error = str(exc)
+                sleep_time = 5.0 * (attempt + 1)
+                if "429" in last_error or "Rate limit" in last_error:
+                    sleep_time = max(sleep_time, 65.0)
+                time.sleep(sleep_time)
+        return idx, "NeedsJudge", last_error or "unknown error"
 
     with ThreadPoolExecutor(max_workers=parallel_workers) as executor:
         futures = [executor.submit(call_one, i, p) for i, p in enumerate(prompts)]
         for future in tqdm(as_completed(futures), total=len(futures), desc="LLM Judge"):
-            idx, text = future.result()
+            idx, text, error = future.result()
             results[idx] = text
+            errors[idx] = error
 
-    return results
+    return results, errors
 
 
 def judge_via_vllm(prompts, judge_model_path, judge_max_tokens):
@@ -131,7 +191,7 @@ def judge_via_vllm(prompts, judge_model_path, judge_max_tokens):
         chat_prompts.append(text)
 
     outputs = llm.generate(chat_prompts, sampling_params)
-    return [output.outputs[0].text.strip() for output in outputs]
+    return [output.outputs[0].text.strip() for output in outputs], [""] * len(outputs)
 
 
 def main():
@@ -143,6 +203,18 @@ def main():
     parser.add_argument("--api_key", default="EMPTY", type=str)
     parser.add_argument("--judge_model", default=None, type=str, help="Model name for API-based judging")
     parser.add_argument("--judge_max_tokens", default=2048, type=int)
+    parser.add_argument(
+        "--judge_parallel_workers",
+        default=int(os.environ.get("JUDGE_PARALLEL_WORKERS", "32")),
+        type=int,
+        help="Parallel workers for API-based judging.",
+    )
+    parser.add_argument(
+        "--judge_rpm",
+        default=float(os.environ.get("JUDGE_RPM", "0")),
+        type=float,
+        help="Optional API request rate limit per minute. Use this for rate-limited judge APIs.",
+    )
     parser.add_argument(
         "--answer_dir",
         default=os.environ.get("OUT_DIR", "model_answer"),
@@ -199,19 +271,23 @@ def main():
             except Exception:
                 is_correct = False
 
-        is_letter_correct = False
+        gt_option = ""
+        pred_option = ""
         if not is_correct and is_mcq:
             try:
-                is_letter_correct = first_letter_match(gt, extracted_answer)
+                gt_option = extract_gt_option(gt)
+                pred_option = extract_strict_final_option(extracted_answer)
             except Exception:
-                is_letter_correct = False
+                gt_option = ""
+                pred_option = ""
 
         if is_correct:
             item["judge"] = "Yes"
             item["judge_source"] = "mathruler"
-        elif is_letter_correct:
-            item["judge"] = "Yes"
-            item["judge_source"] = "first letter"
+        elif gt_option and pred_option:
+            item["judge"] = "Yes" if gt_option == pred_option else "No"
+            item["judge_source"] = "strict_final_option"
+            item["strict_final_option"] = pred_option
         else:
             prompt = PROMPT_TEMPLATE.format(gt=gt, response=extracted_answer, question=question)
             to_llm_indices.append(i)
@@ -221,16 +297,25 @@ def main():
         print(f"Calling LLM judge for {len(prompt_lists)} remaining cases...")
         if args.api_base:
             judge_model_name = args.judge_model or "default"
-            results = judge_via_api(
-                prompt_lists, args.api_base, args.api_key, judge_model_name, args.judge_max_tokens
+            results, errors = judge_via_api(
+                prompt_lists,
+                args.api_base,
+                args.api_key,
+                judge_model_name,
+                args.judge_max_tokens,
+                parallel_workers=args.judge_parallel_workers,
+                judge_rpm=args.judge_rpm,
             )
         else:
-            results = judge_via_vllm(prompt_lists, args.judge_model_path, args.judge_max_tokens)
+            results, errors = judge_via_vllm(prompt_lists, args.judge_model_path, args.judge_max_tokens)
 
-        for idx_in_llm, response_text in enumerate(results):
+        for idx_in_llm, (response_text, error) in enumerate(zip(results, errors, strict=True)):
             original_idx = to_llm_indices[idx_in_llm]
-            data_list[original_idx]["judge"] = response_text
-            data_list[original_idx]["judge_source"] = "llm"
+            data_list[original_idx]["judge"] = normalize_judge(response_text)
+            data_list[original_idx]["judge_raw"] = response_text
+            data_list[original_idx]["judge_source"] = "api_error" if error else "llm"
+            if error:
+                data_list[original_idx]["judge_error"] = error
 
     print(f"Total: {len(data_list)}, LLM used: {len(prompt_lists)}")
 

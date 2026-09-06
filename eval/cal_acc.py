@@ -8,6 +8,21 @@ def is_correct(item):
     return str(item.get("judge", "")).strip().lower() == "yes"
 
 
+def warn_unfinished_judges(records):
+    unfinished = [
+        item
+        for item in records
+        if str(item.get("judge", "")).strip() in {"NeedsJudge", "api_error"}
+        or item.get("judge_source") in {"needs_api", "api_error"}
+    ]
+    if unfinished:
+        print(
+            f"WARNING: {len(unfinished)} judge results are unfinished or failed API calls; "
+            "they are not counted as correct.",
+            file=sys.stderr,
+        )
+
+
 def acc_text(correct, total):
     pct = (100.0 * correct / total) if total else 0.0
     return f"{correct}/{total} = {pct:.2f}%"
@@ -16,6 +31,7 @@ def acc_text(correct, total):
 def calc_vstar(judge_json, benchmark):
     with open(judge_json, "r", encoding="utf-8") as f:
         data = json.load(f)
+    warn_unfinished_judges(data)
 
     category_stats = defaultdict(lambda: {"correct": 0, "total": 0})
     overall_correct = 0
@@ -39,6 +55,7 @@ def calc_vstar(judge_json, benchmark):
 def calc_hrbench(judge_json, benchmark, benchmark_json):
     with open(judge_json, "r", encoding="utf-8") as f:
         records = json.load(f)
+    warn_unfinished_judges(records)
     with open(benchmark_json, "r", encoding="utf-8") as f:
         benchmark_records = json.load(f)
 
@@ -78,6 +95,7 @@ def calc_hrbench(judge_json, benchmark, benchmark_json):
 def calc_mme_realworld(judge_json, benchmark, benchmark_json):
     with open(judge_json, "r", encoding="utf-8") as f:
         records = json.load(f)
+    warn_unfinished_judges(records)
     with open(benchmark_json, "r", encoding="utf-8") as f:
         benchmark_records = json.load(f)
 
@@ -123,6 +141,7 @@ def calc_mme_realworld(judge_json, benchmark, benchmark_json):
 def calc_generic(judge_json, benchmark):
     with open(judge_json, "r", encoding="utf-8") as f:
         data = json.load(f)
+    warn_unfinished_judges(data)
     n = len(data)
     c = sum(1 for x in data if is_correct(x))
     print(f"{benchmark} Acc: {c}/{n} = {100 * c / n:.2f}%")
