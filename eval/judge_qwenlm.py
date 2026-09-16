@@ -17,6 +17,8 @@ MCQ_BENCHMARKS = [
     "mme-realworld-cn",
 ]
 
+SCORING_MODES = ["legacy", "robust"]
+
 PROMPT_TEMPLATE = (
     "Your task is to judge whether the response expresses the same meaning "
     "as the answer of a question.\n"
@@ -52,6 +54,20 @@ def extract_gt_option(gt):
         return ""
     match = re.search(r"([A-F])", gt.strip(), flags=re.IGNORECASE)
     return match.group(1).upper() if match else ""
+
+
+def extract_first_option_legacy(text):
+    if not isinstance(text, str):
+        return ""
+    for pattern in [
+        r"\(([A-Z])\)",
+        r"([A-Z])[\.\)\s]",
+        r"([A-Z])",
+    ]:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1).upper()
+    return ""
 
 
 def extract_strict_final_option(answer):
@@ -204,6 +220,12 @@ def main():
     parser.add_argument("--judge_model", default=None, type=str, help="Model name for API-based judging")
     parser.add_argument("--judge_max_tokens", default=2048, type=int)
     parser.add_argument(
+        "--scoring_mode",
+        choices=SCORING_MODES,
+        default=os.environ.get("EVAL_SCORING_MODE", "legacy"),
+        help="legacy keeps the original first-option scoring behavior; robust uses stricter final-answer extraction and judge normalization.",
+    )
+    parser.add_argument(
         "--judge_parallel_workers",
         default=int(os.environ.get("JUDGE_PARALLEL_WORKERS", "32")),
         type=int,
@@ -276,7 +298,10 @@ def main():
         if not is_correct and is_mcq:
             try:
                 gt_option = extract_gt_option(gt)
-                pred_option = extract_strict_final_option(extracted_answer)
+                if args.scoring_mode == "robust":
+                    pred_option = extract_strict_final_option(extracted_answer)
+                else:
+                    pred_option = extract_first_option_legacy(extracted_answer)
             except Exception:
                 gt_option = ""
                 pred_option = ""
@@ -311,7 +336,10 @@ def main():
 
         for idx_in_llm, (response_text, error) in enumerate(zip(results, errors, strict=True)):
             original_idx = to_llm_indices[idx_in_llm]
-            data_list[original_idx]["judge"] = normalize_judge(response_text)
+            if args.scoring_mode == "robust":
+                data_list[original_idx]["judge"] = normalize_judge(response_text)
+            else:
+                data_list[original_idx]["judge"] = (response_text or "").strip()
             data_list[original_idx]["judge_raw"] = response_text
             data_list[original_idx]["judge_source"] = "api_error" if error else "llm"
             if error:

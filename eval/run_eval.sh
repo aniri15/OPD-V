@@ -39,6 +39,7 @@ JUDGE_API_KEY="${JUDGE_API_KEY:-}"
 JUDGE_MODEL="${JUDGE_MODEL:-}"
 JUDGE_MODEL_PATH="${JUDGE_MODEL_PATH:-}"
 JUDGE_MAX_TOKENS="${JUDGE_MAX_TOKENS:-2048}"
+EVAL_SCORING_MODE="${EVAL_SCORING_MODE:-legacy}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EVAL_DATA_DIR="${EVAL_DATA_DIR:-${SCRIPT_DIR}}"
@@ -106,6 +107,7 @@ run_single_benchmark() {
   [[ -n "${JUDGE_MODEL}" ]] && JUDGE_ARGS+=(--judge_model "${JUDGE_MODEL}")
   [[ -n "${JUDGE_MODEL_PATH}" ]] && JUDGE_ARGS+=(--judge_model_path "${JUDGE_MODEL_PATH}")
   [[ -n "${JUDGE_MAX_TOKENS}" ]] && JUDGE_ARGS+=(--judge_max_tokens "${JUDGE_MAX_TOKENS}")
+  JUDGE_ARGS+=(--scoring_mode "${EVAL_SCORING_MODE}")
 
   local judge_benchmark="${bench}"
   local judge_model_tag="${model_tag}"
